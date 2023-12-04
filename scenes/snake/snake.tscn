@@ -1,0 +1,19 @@
+[gd_scene load_steps=5 format=3 uid="uid://bdbucps2pqc1v"]
+
+[ext_resource type="Texture2D" uid="uid://x6t0ppf8c1c" path="res://Assets/Madu_pea-sheet.png" id="1_h1d25"]
+[ext_resource type="Script" path="res://scenes/snake/snake.gd" id="2_0i4nl"]
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_5j5s2"]
+texture = ExtResource("1_h1d25")
+texture_region_size = Vector2i(40, 40)
+0:0/0 = 0
+2:0/0 = 0
+
+[sub_resource type="TileSet" id="TileSet_xbkkr"]
+tile_size = Vector2i(40, 40)
+sources/0 = SubResource("TileSetAtlasSource_5j5s2")
+
+[node name="SnakeBody" type="TileMap"]
+tile_set = SubResource("TileSet_xbkkr")
+format = 2
+script = ExtResource("2_0i4nl")

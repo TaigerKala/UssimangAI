@@ -1,0 +1,28 @@
+[gd_scene load_steps=7 format=3 uid="uid://bpbwud5qen6d8"]
+
+[ext_resource type="Script" path="res://main.gd" id="1_5jggb"]
+[ext_resource type="Texture2D" uid="uid://x6t0ppf8c1c" path="res://Assets/Madu_pea-sheet.png" id="1_6xkpb"]
+[ext_resource type="Texture2D" uid="uid://c8cfd2xba7mj4" path="res://Assets/oun.png" id="2_jf7sx"]
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_d5mhn"]
+texture = ExtResource("1_6xkpb")
+texture_region_size = Vector2i(40, 40)
+2:0/0 = 0
+0:0/0 = 0
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_qerys"]
+texture = ExtResource("2_jf7sx")
+texture_region_size = Vector2i(40, 40)
+0:0/0 = 0
+
+[sub_resource type="TileSet" id="TileSet_4vx4x"]
+tile_size = Vector2i(40, 40)
+sources/0 = SubResource("TileSetAtlasSource_d5mhn")
+sources/1 = SubResource("TileSetAtlasSource_qerys")
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_5jggb")
+
+[node name="Objektid" type="TileMap" parent="."]
+tile_set = SubResource("TileSet_4vx4x")
+format = 2
