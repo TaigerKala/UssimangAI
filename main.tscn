@@ -8,7 +8,16 @@
 texture = ExtResource("1_6xkpb")
 texture_region_size = Vector2i(40, 40)
 2:0/0 = 0
+0:0/next_alternative_id = 5
 0:0/0 = 0
+0:0/1 = 1
+0:0/2 = 2
+0:0/2/flip_v = true
+0:0/3 = 3
+0:0/3/transpose = true
+0:0/4 = 4
+0:0/4/flip_h = true
+0:0/4/transpose = true
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_qerys"]
 texture = ExtResource("2_jf7sx")
@@ -26,3 +35,10 @@ script = ExtResource("1_5jggb")
 [node name="Objektid" type="TileMap" parent="."]
 tile_set = SubResource("TileSet_4vx4x")
 format = 2
+layer_0/name = "SNAKE"
+layer_1/name = "OUN"
+layer_1/tile_data = PackedInt32Array()
+
+[node name="SnakeTimer" type="Timer" parent="."]
+wait_time = 0.1
+autostart = true
