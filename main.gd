@@ -8,11 +8,51 @@ const APPLE_LAYER = 1
 @onready var objektid = $Objektid
 @onready var snake_timer = $SnakeTimer
 
+# Muutujad A* algoritmi jaoks
+var open_set := []
+var closed_set := []
+var came_from := {}
+var g_score := {}
+var f_score := {}
+
+#Ussimängu muutujad
 var apple_pos: Vector2i
 var snake_direction := Vector2i(1,0)
 var snake_body_positions := [Vector2i(5,10), Vector2i(4,10), Vector2i(3,10)]
 var bite_apple := false
 var snake_timer_stop := false
+
+func heuristic_cost_estimate(current, goal) -> float:
+	return abs(current.x - goal.x) + abs(current.y - goal.y)
+
+func get_lowest_f_score(nodes) -> Vector2i:
+	var lowest = nodes[0]
+	for node in nodes:
+		if f_score[node] < f_score[lowest]:
+			lowest = node
+	return lowest
+
+func reconstruct_path(came_from, current) -> void:
+	var total_path = [current]
+	while came_from.has(current):
+		current = came_from[current]
+		total_path.append(current)
+	
+	total_path.invert()
+	
+	if total_path.size() > 1:
+		snake_direction = total_path[1] - snake_body_positions[0]
+		# Kui madu pöörab tagasi, muuda suunda vastupidiseks
+		if total_path[1] == snake_body_positions[1]:
+			snake_direction *= -1
+
+func get_neighbors(node) -> Array:
+	var neighbors = []
+	for dir in [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]:
+		var neighbor = node + dir
+		if neighbor.x >= 0 and neighbor.x < 20 and neighbor.y >= 0 and neighbor.y < 20:
+			neighbors.append(neighbor)
+	return neighbors
 
 func _ready() -> void:
 	apple_pos = place_apple()
@@ -93,6 +133,10 @@ func move_snake() -> void:
 	
 func delete_tiles(layer_number):
 	objektid.clear_layer(layer_number)
+
+
+
+
 	
 func _on_timeout():
 	move_snake()
@@ -102,6 +146,39 @@ func _on_timeout():
 	check_game_over()
 	queue_redraw()
 
+# A* algoritm
+	if not bite_apple:
+		var start = snake_body_positions[0]
+		var goal = apple_pos
+		
+		open_set = [start]
+		came_from = {}
+		g_score = {start: 0}
+		f_score = {start: heuristic_cost_estimate(start, goal)}
+		
+		while open_set.size() > 0:
+			var current = get_lowest_f_score(open_set)
+			
+			if current == goal:
+				reconstruct_path(came_from, current)
+				break
+			
+			open_set.erase(current)
+			closed_set.append(current)
+			
+			for neighbor in get_neighbors(current):
+				if closed_set.find(neighbor) != -1:
+					continue
+				
+				var tentative_g_score = g_score[current] + 1
+				
+				if open_set.find(neighbor) == -1 or tentative_g_score < g_score[neighbor]:
+					came_from[neighbor] = current
+					g_score[neighbor] = tentative_g_score
+					f_score[neighbor] = g_score[neighbor] + heuristic_cost_estimate(neighbor, goal)
+					
+					if open_set.find(neighbor) == -1:
+						open_set.append(neighbor)
 func check_apple_eaten() -> void:
 	if apple_pos == snake_body_positions[0]:
 		apple_pos = place_apple()
