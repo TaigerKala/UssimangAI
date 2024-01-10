@@ -8,19 +8,18 @@ const APPLE_LAYER = 1
 @onready var objektid = $Objektid
 @onready var snake_timer = $SnakeTimer
 
-# Muutujad A* algoritmi jaoks
+var apple_pos: Vector2i
+var snake_direction := Vector2i(1, 0)
+var snake_body_positions := [Vector2i(5, 10), Vector2i(4, 10), Vector2i(3, 10)]
+var bite_apple := false
+var snake_timer_stop := false
+
+# A* algoritmi muutujad
 var open_set := []
 var closed_set := []
 var came_from := {}
 var g_score := {}
 var f_score := {}
-
-#Ussimängu muutujad
-var apple_pos: Vector2i
-var snake_direction := Vector2i(1,0)
-var snake_body_positions := [Vector2i(5,10), Vector2i(4,10), Vector2i(3,10)]
-var bite_apple := false
-var snake_timer_stop := false
 
 func heuristic_cost_estimate(current, goal) -> float:
 	return abs(current.x - goal.x) + abs(current.y - goal.y)
@@ -37,13 +36,12 @@ func reconstruct_path(came_from, current) -> void:
 	while came_from.has(current):
 		current = came_from[current]
 		total_path.append(current)
-	
-	total_path.invert()
-	
+
+	total_path.reverse()
+
 	if total_path.size() > 1:
 		snake_direction = total_path[1] - snake_body_positions[0]
-		# Kui madu pöörab tagasi, muuda suunda vastupidiseks
-		if total_path[1] == snake_body_positions[1]:
+		if came_from[current] == snake_body_positions[1]:
 			snake_direction *= -1
 
 func get_neighbors(node) -> Array:
@@ -59,21 +57,10 @@ func _ready() -> void:
 	snake_timer.timeout.connect(_on_timeout)
 	draw_apple()
 
+	# Muutke ussi algne suund siin
+	snake_direction = Vector2i(1, 0)
+
 func _input(event: InputEvent):
-	#If-statementid et vältida tagasi endasse liikumist
-	#BUG - Kui korraga klahve vajutada saab ikkagi tagasi liiguda
-	if Input.is_action_just_pressed("up"):
-		if not snake_direction == Vector2i(0,1):
-			snake_direction = Vector2i(0, -1)
-	if Input.is_action_just_pressed("down"):
-		if not snake_direction == Vector2i(0,-1):
-			snake_direction =  Vector2i(0, 1)
-	if Input.is_action_just_pressed("left"):
-		if not snake_direction == Vector2i(1,0):
-			snake_direction =  Vector2i(-1, 0)
-	if Input.is_action_just_pressed("right"):
-		if not snake_direction == Vector2i(-1,0):
-			snake_direction =  Vector2i(1, 0)
 	if Input.is_action_just_pressed("start_stop"):
 		if snake_timer_stop == false:
 			snake_timer.stop()
@@ -88,37 +75,19 @@ func place_apple() -> Vector2:
 	randomize()
 	var x := randi_range(0, 19)
 	var y := randi_range(0, 19)
-	return Vector2i(x,y)
+	return Vector2i(x, y)
 
 func draw_apple() -> void:
 	delete_tiles(APPLE_LAYER)
-	objektid.set_cell(APPLE_LAYER, apple_pos, APPLE_ID,Vector2i(0,0))
-	
+	objektid.set_cell(APPLE_LAYER, apple_pos, APPLE_ID, Vector2i(0, 0))
+
 func draw_snake() -> void:
-	var head = snake_body_positions[0]
+	delete_tiles(SNAKE_LAYER)
 	for block in snake_body_positions:
-		objektid.set_cell(SNAKE_LAYER, Vector2i(block.x, block.y), SNAKE_ID, Vector2i(2,0))
-		#Dir - UP, pööra pead
-		if snake_direction == Vector2i(0, -1):
-			objektid.set_cell(SNAKE_LAYER, Vector2i(head.x, head.y), SNAKE_ID, Vector2i(0,0), 1)
-		#Dir - DOWN, pööra pead
-		if snake_direction == Vector2i(0, 1):
-			objektid.set_cell(SNAKE_LAYER, Vector2i(head.x, head.y), SNAKE_ID, Vector2i(0,0), 2)
-		#Dir - LEFT, pööra pead
-		if snake_direction == Vector2i(-1, 0):
-			objektid.set_cell(SNAKE_LAYER, Vector2i(head.x, head.y), SNAKE_ID, Vector2i(0,0), 3)
-		#Dir - RIGHT, pööra pead
-		if snake_direction == Vector2i(1, 0):
-			objektid.set_cell(SNAKE_LAYER, Vector2i(head.x, head.y), SNAKE_ID, Vector2i(0,0), 4)
-	
-	var snake_head_global_pos = getTileMapGlobalPos(head)
-	var apple_global_pos = getTileMapGlobalPos(apple_pos)
-	draw_line(snake_head_global_pos ,Vector2i(snake_head_global_pos.x, apple_global_pos.y), Color.CADET_BLUE, 8.0)
-	draw_line(Vector2i(snake_head_global_pos.x, apple_global_pos.y) ,apple_global_pos, Color.CADET_BLUE, 8.0)
-	
+		objektid.set_cell(SNAKE_LAYER, block, SNAKE_ID, Vector2i(2, 0))
+
 func move_snake() -> void:
 	if bite_apple:
-		delete_tiles(SNAKE_LAYER)
 		var body_copy = snake_body_positions.slice(0, snake_body_positions.size())
 		var new_head = body_copy[0] + snake_direction
 		body_copy.insert(0, new_head)
@@ -126,18 +95,49 @@ func move_snake() -> void:
 		bite_apple = false
 	else:
 		delete_tiles(SNAKE_LAYER)
+		var start = snake_body_positions[0]
+		var goal = apple_pos
+
+		open_set = [start]
+		came_from = {}
+		g_score = {start: 0}
+		f_score = {start: heuristic_cost_estimate(start, goal)}
+
+		while open_set.size() > 0:
+			var current = get_lowest_f_score(open_set)
+
+			if current == goal:
+				reconstruct_path(came_from, current)
+				break
+
+			open_set.erase(current)
+			closed_set.append(current)
+
+			for neighbor in get_neighbors(current):
+				if closed_set.find(neighbor) != -1:
+					continue
+
+				var tentative_g_score = g_score[current] + 1
+
+				if !g_score.has(neighbor) or tentative_g_score < g_score[neighbor]:
+					came_from[neighbor] = current
+					g_score[neighbor] = tentative_g_score
+					f_score[neighbor] = g_score[neighbor] + heuristic_cost_estimate(neighbor, goal)
+
+					if open_set.find(neighbor) == -1:
+						open_set.append(neighbor)
+
+		if came_from.has(start):
+			snake_direction = start - snake_body_positions[0]
+
 		var body_copy = snake_body_positions.slice(0, snake_body_positions.size() - 1)
 		var new_head = body_copy[0] + snake_direction
 		body_copy.insert(0, new_head)
 		snake_body_positions = body_copy
-	
+
 func delete_tiles(layer_number):
 	objektid.clear_layer(layer_number)
 
-
-
-
-	
 func _on_timeout():
 	move_snake()
 	draw_snake()
@@ -146,39 +146,6 @@ func _on_timeout():
 	check_game_over()
 	queue_redraw()
 
-# A* algoritm
-	if not bite_apple:
-		var start = snake_body_positions[0]
-		var goal = apple_pos
-		
-		open_set = [start]
-		came_from = {}
-		g_score = {start: 0}
-		f_score = {start: heuristic_cost_estimate(start, goal)}
-		
-		while open_set.size() > 0:
-			var current = get_lowest_f_score(open_set)
-			
-			if current == goal:
-				reconstruct_path(came_from, current)
-				break
-			
-			open_set.erase(current)
-			closed_set.append(current)
-			
-			for neighbor in get_neighbors(current):
-				if closed_set.find(neighbor) != -1:
-					continue
-				
-				var tentative_g_score = g_score[current] + 1
-				
-				if open_set.find(neighbor) == -1 or tentative_g_score < g_score[neighbor]:
-					came_from[neighbor] = current
-					g_score[neighbor] = tentative_g_score
-					f_score[neighbor] = g_score[neighbor] + heuristic_cost_estimate(neighbor, goal)
-					
-					if open_set.find(neighbor) == -1:
-						open_set.append(neighbor)
 func check_apple_eaten() -> void:
 	if apple_pos == snake_body_positions[0]:
 		apple_pos = place_apple()
@@ -186,34 +153,12 @@ func check_apple_eaten() -> void:
 
 func check_game_over() -> void:
 	var head = snake_body_positions[0]
-	#Uss põrkab vastu seina
-	if head.x > 20 or head.x < 0 or head.y < 0 or head.y > 20:
+	if head.x > 19 or head.x < 0 or head.y < 0 or head.y > 19:
 		game_over()
-	#Uss põrkab vastu keha
 	for block in snake_body_positions.slice(1, snake_body_positions.size() - 1):
 		if block == head:
 			game_over()
-	
+
 func game_over() -> void:
 	snake_timer.stop()
 	print("Põrge")
-	
-#Joonista heuristika
-func getTileMapGlobalPos(vektor: Vector2i) -> Vector2i:
-	var cellCoords = vektor
-	var localCellPos = objektid.map_to_local(cellCoords)
-	var global_CellPos = objektid.to_global(localCellPos)
-	
-	return global_CellPos
-
-func _draw() -> void:
-	var snake_head = snake_body_positions[0]
-	var snake_head_global_pos = getTileMapGlobalPos(snake_head)
-	var apple_global_pos = getTileMapGlobalPos(apple_pos)
-	
-	if snake_direction.x == -1 or snake_direction.y == -1:
-		draw_line(snake_head_global_pos ,Vector2i(snake_head_global_pos.x, apple_global_pos.y), Color.CADET_BLUE, 8.0)
-		draw_line(Vector2i(snake_head_global_pos.x, apple_global_pos.y) ,apple_global_pos, Color.CADET_BLUE, 8.0)
-	elif snake_direction.x == 1 or snake_direction.y == 1:
-		draw_line(snake_head_global_pos ,Vector2i(apple_global_pos.x, snake_head_global_pos.y), Color.CADET_BLUE, 8.0)
-		draw_line(Vector2i(apple_global_pos.x, snake_head_global_pos.y) ,apple_global_pos, Color.CADET_BLUE, 8.0)
