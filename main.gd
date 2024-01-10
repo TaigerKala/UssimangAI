@@ -114,29 +114,33 @@ func draw_snake() -> void:
 			objektid.set_cell(SNAKE_LAYER, Vector2(head.x, head.y), SNAKE_ID, Vector2(0,0), 4)
 	
 func move_snake(valitud_tee: Array) -> void:
+	#Kontroll, et programm lolliks ei läheks
 	if valitud_tee.is_empty():
 		return
+
 	if bite_apple:
+
 		delete_tiles(SNAKE_LAYER)
 		var body_copy = snake_body_positions.slice(1, snake_body_positions.size())
-		var new_head = valitud_tee[-2] 
+		var new_head = valitud_tee[0] 
 		body_copy.insert(0, new_head)
 		snake_body_positions = body_copy
 		bite_apple = false
-		tee_ounani = false
+
 	else:
 		delete_tiles(SNAKE_LAYER)
 		var body_copy = snake_body_positions.slice(0, snake_body_positions.size() - 1)
-		var new_head = valitud_tee[-2]  
+		var new_head = valitud_tee[0]  
 		body_copy.insert(0, new_head)
 		snake_body_positions = body_copy
 	
-		valitud_tee.pop_back()
+		valitud_tee.pop_front()
 	
 func delete_tiles(layer_number):
 	objektid.clear_layer(layer_number)
 	
 func _on_timeout():
+	
 	check_apple_eaten()
 	check_game_over()
 	
@@ -145,6 +149,9 @@ func _on_timeout():
 		tee_ounani = true
 	
 	move_snake(path_to_apple)
+
+	print(tee_ounani)
+	
 	draw_snake()
 	draw_apple()
 	queue_redraw()
@@ -154,7 +161,6 @@ func check_apple_eaten() -> void:
 		apple_pos = place_apple()
 		bite_apple = true
 		tee_ounani = false
-
 func check_game_over() -> void:
 	var head = snake_body_positions[0]
 	#Uss põrkab vastu seina
@@ -192,38 +198,44 @@ func _draw() -> void:
 func a_star_algoritm() -> Array:
 	var valitud_tee: Array
 # A* algoritm
-	if not bite_apple:
-		var start = snake_body_positions[0]
-		var goal = apple_pos
-		print(goal)
+	var start = snake_body_positions[0]
+	print(start)
+	var goal = apple_pos
+	print(goal)
+	
+	open_set = [start]
+	came_from = {}
+	g_score = {start: 0}
+	f_score = {start: heuristic_cost_estimate(start, goal)}
+	
+	print(open_set)
+	while open_set.size() > 0:
+		var current = get_lowest_f_score(open_set)
+		print("see on current: ", current)
 		
-		open_set = [start]
-		came_from = {}
-		g_score = {start: 0}
-		f_score = {start: heuristic_cost_estimate(start, goal)}
+		if current == goal:
+			valitud_tee = reconstruct_path(came_from, current)
+			break
 		
-		while open_set.size() > 0:
-			var current = get_lowest_f_score(open_set)
+		open_set.erase(current)
+		closed_set.append(current)
+		
+		for neighbor in get_neighbors(current):
+			if closed_set.find(neighbor) != -1:
+				continue
 			
-			if current == goal:
-				valitud_tee = reconstruct_path(came_from, current)
-				break
+			var tentative_g_score = g_score[current] + 1
 			
-			open_set.erase(current)
-			closed_set.append(current)
-			
-			for neighbor in get_neighbors(current):
-				if closed_set.find(neighbor) != -1:
-					continue
+			if open_set.find(neighbor) == -1 or tentative_g_score < g_score[neighbor]:
+				came_from[neighbor] = current
+				g_score[neighbor] = tentative_g_score
+				f_score[neighbor] = g_score[neighbor] + heuristic_cost_estimate(neighbor, goal)
 				
-				var tentative_g_score = g_score[current] + 1
-				
-				if open_set.find(neighbor) == -1 or tentative_g_score < g_score[neighbor]:
-					came_from[neighbor] = current
-					g_score[neighbor] = tentative_g_score
-					f_score[neighbor] = g_score[neighbor] + heuristic_cost_estimate(neighbor, goal)
+				if open_set.find(neighbor) == -1:
+					open_set.append(neighbor)
 					
-					if open_set.find(neighbor) == -1:
-						open_set.append(neighbor)
 	print("See on valitud tee: ", valitud_tee)
+	valitud_tee.pop_back()
+	valitud_tee.reverse()
+	print("See on ümbertehtud tee: ", valitud_tee)
 	return valitud_tee
