@@ -7,6 +7,7 @@ const APPLE_LAYER = 1
 
 @onready var objektid = $Objektid
 @onready var snake_timer = $SnakeTimer
+@onready var skoori_label = $Skoor
 @onready var astar_grid
 
 
@@ -17,6 +18,8 @@ var snake_body_positions := [Vector2i(5,10), Vector2i(4,10), Vector2i(3,10)]
 var bite_apple := false
 var snake_timer_stop := false
 var solid_points := []
+var oun_ussis := false
+var skoori_number := 0
 
 func _ready() -> void:
 	#apple_pos = place_apple()
@@ -25,7 +28,7 @@ func _ready() -> void:
 	draw_apple()
 	
 	astar_grid = AStarGrid2D.new()
-	astar_grid.size = Vector2i(800, 800)
+	astar_grid.region = Rect2i(Vector2i(0, 1), Vector2i(800, 800))
 	astar_grid.cell_size = Vector2(40, 40)
 	astar_grid.default_compute_heuristic = AStarGrid2D.HEURISTIC_MANHATTAN
 	astar_grid.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
@@ -60,7 +63,7 @@ func _input(_event: InputEvent):
 func place_apple() -> Vector2:
 	randomize()
 	var x := randi_range(0, 19)
-	var y := randi_range(0, 19)
+	var y := randi_range(1, 19)
 	return Vector2(x,y)
 
 func draw_apple() -> void:
@@ -87,6 +90,12 @@ func draw_snake() -> void:
 func move_snake(coord_list: Array) -> void:
 	if coord_list.is_empty():
 		return
+	var alg_vektor: Vector2 = snake_body_positions[0]
+	var lopp_vektor: Vector2 = coord_list[0]
+	var suuna_vektor: Vector2 = lopp_vektor - alg_vektor
+	
+	snake_direction = suuna_vektor.normalized()
+	
 	print("See on coord list ", coord_list)
 	if bite_apple:
 		delete_tiles(SNAKE_LAYER)
@@ -101,7 +110,6 @@ func move_snake(coord_list: Array) -> void:
 		var new_head = coord_list[0]
 		body_copy.insert(0, new_head)
 		snake_body_positions = body_copy
-	coord_list.pop_front()
 
 func delete_tiles(layer_number):
 	objektid.clear_layer(layer_number)
@@ -117,7 +125,18 @@ func _on_timeout():
 
 func check_apple_eaten() -> void:
 	if apple_pos == snake_body_positions[0]:
+		skoori_number += 1
+		skoori_label.text = "SKOOR: %s" % skoori_number
+		oun_ussis = true
 		apple_pos = place_apple()
+		while oun_ussis:
+			if apple_pos in snake_body_positions:
+				print("Õun on ussi sees")
+				apple_pos = place_apple()
+				oun_ussis = true
+			else:
+				oun_ussis = false
+			
 		bite_apple = true
 
 func check_game_over() -> void:
@@ -143,16 +162,15 @@ func getTileMapGlobalPos(vektor: Vector2) -> Vector2:
 	return global_CellPos
 
 func _draw() -> void:
-	var snake_head = snake_body_positions[0]
-	var snake_head_global_pos = getTileMapGlobalPos(snake_head)
-	var apple_global_pos = getTileMapGlobalPos(apple_pos)
+	var positsioon = a_star_algoritm()
+	var positsioon_koopia := []
 	
-	if snake_direction.x == -1 or snake_direction.y == -1:
-		draw_line(snake_head_global_pos ,Vector2(snake_head_global_pos.x, apple_global_pos.y), Color.CADET_BLUE, 8.0)
-		draw_line(Vector2(snake_head_global_pos.x, apple_global_pos.y) ,apple_global_pos, Color.CADET_BLUE, 8.0)
-	elif snake_direction.x == 1 or snake_direction.y == 1:
-		draw_line(snake_head_global_pos ,Vector2(apple_global_pos.x, snake_head_global_pos.y), Color.CADET_BLUE, 8.0)
-		draw_line(Vector2(apple_global_pos.x, snake_head_global_pos.y) ,apple_global_pos, Color.CADET_BLUE, 8.0)
+	for i in positsioon:
+		positsioon_koopia.append(getTileMapGlobalPos(i))
+	
+	var joonista_heuristika: PackedVector2Array = positsioon_koopia
+	
+	draw_polyline(joonista_heuristika, Color.AQUA, 8.0)
 
 func a_star_algoritm() -> Array:
 	print("Need on solid pointid ", solid_points)
@@ -183,4 +201,3 @@ func a_star_algoritm() -> Array:
 		local_pos_list.append(Vector2i(x_pos, y_pos))
 	local_pos_list.pop_front()
 	return local_pos_list
-
