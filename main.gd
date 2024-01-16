@@ -22,8 +22,8 @@ var oun_ussis := false
 var skoori_number := 0
 
 func _ready() -> void:
-	#apple_pos = place_apple()
-	apple_pos = Vector2(10,5)
+	apple_pos = place_apple()
+	#apple_pos = Vector2(0,19)
 	snake_timer.timeout.connect(_on_timeout)
 	draw_apple()
 	
