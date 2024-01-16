@@ -7,59 +7,30 @@ const APPLE_LAYER = 1
 
 @onready var objektid = $Objektid
 @onready var snake_timer = $SnakeTimer
+@onready var astar_grid
 
-# Muutujad A* algoritmi jaoks
-var open_set := []
-var closed_set := []
-var came_from := {}
-var g_score := {}
-var f_score := {}
-var path_to_apple: Array
-var tee_ounani := false
 
 #Ussimängu muutujad
-var apple_pos: Vector2
+var apple_pos: Vector2i
 var snake_direction := Vector2(1,0)
-var snake_body_positions := [Vector2(5,10), Vector2(4,10), Vector2(3,10)]
+var snake_body_positions := [Vector2i(5,10), Vector2i(4,10), Vector2i(3,10)]
 var bite_apple := false
 var snake_timer_stop := false
-
-func heuristic_cost_estimate(current, goal) -> float:
-	return abs(current.x - goal.x) + abs(current.y - goal.y)
-
-func get_lowest_f_score(nodes) -> Vector2:
-	var lowest = nodes[0]
-	for node in nodes:
-		if f_score[node] < f_score[lowest]:
-			lowest = node
-	return lowest
-
-func reconstruct_path(came_from, current) -> Array:
-	var total_path = [current]
-	while came_from.has(current):
-		current = came_from[current]
-		total_path.append(current)
-	
-	#if total_path.size() > 1:
-		#snake_direction = total_path[1] - snake_body_positions[0]
-		## Kui madu pöörab tagasi, muuda suunda vastupidiseks
-		#if total_path[1] == snake_body_positions[1]:
-			#snake_direction *= -1
-	return total_path
-
-func get_neighbors(node) -> Array:
-	var neighbors = []
-	for dir in [Vector2(0, -1), Vector2(0, 1), Vector2(-1, 0), Vector2(1, 0)]:
-		var neighbor = node + dir
-		if neighbor.x >= 0 and neighbor.x < 20 and neighbor.y >= 0 and neighbor.y < 20:
-			neighbors.append(neighbor)
-	return neighbors
+var solid_points := []
 
 func _ready() -> void:
-	apple_pos = place_apple()
-	#apple_pos = Vector2(10,5)
+	#apple_pos = place_apple()
+	apple_pos = Vector2(10,5)
 	snake_timer.timeout.connect(_on_timeout)
 	draw_apple()
+	
+	astar_grid = AStarGrid2D.new()
+	astar_grid.size = Vector2i(800, 800)
+	astar_grid.cell_size = Vector2(40, 40)
+	astar_grid.default_compute_heuristic = AStarGrid2D.HEURISTIC_MANHATTAN
+	astar_grid.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
+	astar_grid.jumping_enabled = false
+	astar_grid.update()
 
 func _input(_event: InputEvent):
 	#If-statementid et vältida tagasi endasse liikumist
@@ -113,46 +84,34 @@ func draw_snake() -> void:
 		if snake_direction == Vector2(1, 0):
 			objektid.set_cell(SNAKE_LAYER, Vector2(head.x, head.y), SNAKE_ID, Vector2(0,0), 4)
 	
-func move_snake(valitud_tee: Array) -> void:
-	#Kontroll, et programm lolliks ei läheks
-	if valitud_tee.is_empty():
+func move_snake(coord_list: Array) -> void:
+	if coord_list.is_empty():
 		return
-
+	print("See on coord list ", coord_list)
 	if bite_apple:
-
 		delete_tiles(SNAKE_LAYER)
-		var body_copy = snake_body_positions.slice(1, snake_body_positions.size())
-		var new_head = valitud_tee[0] 
+		var body_copy = snake_body_positions.slice(0, snake_body_positions.size())
+		var new_head = coord_list[0]
 		body_copy.insert(0, new_head)
 		snake_body_positions = body_copy
 		bite_apple = false
-
 	else:
 		delete_tiles(SNAKE_LAYER)
 		var body_copy = snake_body_positions.slice(0, snake_body_positions.size() - 1)
-		var new_head = valitud_tee[0]  
+		var new_head = coord_list[0]
 		body_copy.insert(0, new_head)
 		snake_body_positions = body_copy
-	
-		valitud_tee.pop_front()
-	
+	coord_list.pop_front()
+
 func delete_tiles(layer_number):
 	objektid.clear_layer(layer_number)
-	
+
 func _on_timeout():
-	
+	var coord_list = a_star_algoritm()
+	move_snake(coord_list)
+	draw_snake()
 	check_apple_eaten()
 	check_game_over()
-	
-	if tee_ounani != true:
-		path_to_apple = a_star_algoritm()
-		tee_ounani = true
-	
-	move_snake(path_to_apple)
-
-	print(tee_ounani)
-	
-	draw_snake()
 	draw_apple()
 	queue_redraw()
 
@@ -160,7 +119,7 @@ func check_apple_eaten() -> void:
 	if apple_pos == snake_body_positions[0]:
 		apple_pos = place_apple()
 		bite_apple = true
-		tee_ounani = false
+
 func check_game_over() -> void:
 	var head = snake_body_positions[0]
 	#Uss põrkab vastu seina
@@ -196,46 +155,32 @@ func _draw() -> void:
 		draw_line(Vector2(apple_global_pos.x, snake_head_global_pos.y) ,apple_global_pos, Color.CADET_BLUE, 8.0)
 
 func a_star_algoritm() -> Array:
-	var valitud_tee: Array
-# A* algoritm
-	var start = snake_body_positions[0]
-	print(start)
-	var goal = apple_pos
-	print(goal)
+	print("Need on solid pointid ", solid_points)
 	
-	open_set = [start]
-	came_from = {}
-	g_score = {start: 0}
-	f_score = {start: heuristic_cost_estimate(start, goal)}
+	for j in solid_points:
+		astar_grid.set_point_solid(j, false)
+		solid_points.pop_front()
 	
-	print(open_set)
-	while open_set.size() > 0:
-		var current = get_lowest_f_score(open_set)
-		print("see on current: ", current)
+	for i in snake_body_positions:
+		astar_grid.set_point_solid(i, true)
+		solid_points.append(i)
 		
-		if current == goal:
-			valitud_tee = reconstruct_path(came_from, current)
-			break
+	var a_star_tee = astar_grid.get_point_path(snake_body_positions[0], apple_pos)
+	
+	#Array = PackedVector2Array
+	var valitud_tee: Array = a_star_tee
+	
+	#Coords to local
+	var local_pos_list := []
+	
+	for i in valitud_tee:
+		var x_pos: int = i.x
+		var y_pos:int  = i.y
 		
-		open_set.erase(current)
-		closed_set.append(current)
+		x_pos = x_pos / 40
+		y_pos = y_pos / 40
 		
-		for neighbor in get_neighbors(current):
-			if closed_set.find(neighbor) != -1:
-				continue
-			
-			var tentative_g_score = g_score[current] + 1
-			
-			if open_set.find(neighbor) == -1 or tentative_g_score < g_score[neighbor]:
-				came_from[neighbor] = current
-				g_score[neighbor] = tentative_g_score
-				f_score[neighbor] = g_score[neighbor] + heuristic_cost_estimate(neighbor, goal)
-				
-				if open_set.find(neighbor) == -1:
-					open_set.append(neighbor)
-					
-	print("See on valitud tee: ", valitud_tee)
-	valitud_tee.pop_back()
-	valitud_tee.reverse()
-	print("See on ümbertehtud tee: ", valitud_tee)
-	return valitud_tee
+		local_pos_list.append(Vector2i(x_pos, y_pos))
+	local_pos_list.pop_front()
+	return local_pos_list
+
